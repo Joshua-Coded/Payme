@@ -1,0 +1,17 @@
+{
+  "name": "paychain-contracts",
+  "version": "1.0.0",
+  "description": "PayChain — Solidity smart contract tooling",
+  "scripts": {
+    "node":           "npx hardhat node",
+    "compile":        "npx hardhat compile --config contracts/hardhat.config.js",
+    "deploy:local":   "npx hardhat run scripts/deploy.js --network localhost --config contracts/hardhat.config.js",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia  --config contracts/hardhat.config.js",
+    "test":           "npx hardhat test --config contracts/hardhat.config.js"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.22.0",
+    "dotenv": "^16.0.0"
+  }
+}
