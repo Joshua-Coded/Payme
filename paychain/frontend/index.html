@@ -597,6 +597,9 @@
     <button onclick="showPage('dashboard', this)">Dashboard</button>
   </nav>
   <div class="header-right">
+    <button class="btn-indigo btn-sm" id="connectBtn" onclick="connectWallet()" style="width:auto">
+      Connect Wallet
+    </button>
     <div class="network-pill">
       <div class="dot" id="netDot"></div>
       <span id="netLabel">Connecting</span>
@@ -643,7 +646,10 @@
       </div>
       <div class="field">
         <label>Your wallet address</label>
-        <input id="payerAddr" type="text" placeholder="0x…" />
+        <div style="display:flex;gap:8px">
+          <input id="payerAddr" type="text" placeholder="0x… or connect wallet above" style="flex:1" />
+          <button class="btn-indigo btn-sm" onclick="fillWallet()" style="white-space:nowrap" id="fillBtn" title="Fill from connected wallet">Use wallet</button>
+        </div>
       </div>
       <div class="field">
         <label>Amount</label>
@@ -664,60 +670,61 @@
       <div id="alert1"></div>
 
       <hr class="divider" />
-      <button class="btn btn-primary" onclick="initiatePayment()">Continue</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="initiatePayment()" style="flex:1">Continue</button>
+        <button class="btn btn-outline btn-sm" id="shareLinkBtn" onclick="copyInvoiceLink()" style="white-space:nowrap">Share link</button>
+      </div>
     </div>
 
     <!-- Step 2 -->
     <div id="payStep2" style="display:none">
       <div class="alert alert-warning">
         <span class="alert-icon">⚠</span>
-        <div><strong>Approve token spend first</strong><br>Before the payment can be sent, you need to authorise the PayChain contract to spend your USDC.</div>
+        <div><strong>Step 1 of 2 — Approve USDC spend</strong><br>
+        MetaMask will ask you to allow the PayChain contract to spend your USDC. This is a standard ERC-20 approval — no funds move yet.</div>
       </div>
-
-      <div class="field" style="margin-top:16px">
-        <label>Token contract</label>
-        <input id="approveToken" type="text" readonly />
+      <div class="summary" style="margin-top:16px">
+        <div class="summary-row"><span>Token contract</span><span id="approveToken" style="font-family:monospace;font-size:12px;color:var(--primary)">—</span></div>
+        <div class="summary-row"><span>Spender (PayChain)</span><span id="approveSpender" style="font-family:monospace;font-size:12px;color:var(--primary)">—</span></div>
+        <div class="summary-row total"><span>Approval amount</span><span id="approveAmt">—</span></div>
       </div>
-      <div class="field">
-        <label>Approve calldata</label>
-        <input id="approveCalldata" type="text" readonly style="font-family:monospace;font-size:12px" />
-      </div>
-
       <div id="alert2"></div>
       <hr class="divider" />
-      <button class="btn btn-primary" onclick="simulateApprove()">Simulate approval &amp; continue</button>
+      <button class="btn btn-primary" id="approveBtn" onclick="metamaskApprove()">
+        Approve in MetaMask
+      </button>
+      <p style="text-align:center;font-size:11.5px;color:var(--muted);margin-top:10px">
+        No MetaMask? <a href="#" onclick="simulateApprove();return false" style="color:var(--primary)">Simulate instead</a>
+      </p>
     </div>
 
     <!-- Step 3 -->
     <div id="payStep3" style="display:none">
-      <div class="alert alert-info">
-        <span class="alert-icon">ℹ</span>
-        <div><strong>Approval confirmed</strong> — submit the payment transaction below.</div>
+      <div class="alert alert-success">
+        <span class="alert-icon">✓</span>
+        <div><strong>Approval confirmed</strong> — ready to send the payment.</div>
       </div>
-
-      <div class="field" style="margin-top:16px">
-        <label>Contract address</label>
-        <input id="contractAddrDisp" type="text" readonly />
+      <div class="summary" style="margin-top:16px">
+        <div class="summary-row"><span>Invoice</span><span id="payInvoiceDisp">—</span></div>
+        <div class="summary-row"><span>Merchant</span><span id="payMerchantDisp" style="font-family:monospace;font-size:12px;color:var(--primary)">—</span></div>
+        <div class="summary-row"><span>Contract</span><span id="contractAddrDisp" style="font-family:monospace;font-size:12px;color:var(--primary)">—</span></div>
+        <div class="summary-row total"><span>You pay</span><span id="payAmtDisp" style="color:var(--success)">—</span></div>
       </div>
-      <div class="field">
-        <label>Pay calldata</label>
-        <input id="payCalldata" type="text" readonly style="font-family:monospace;font-size:12px" />
-      </div>
-      <div class="field">
-        <label>Estimated gas</label>
-        <input id="estGas" type="text" readonly />
-      </div>
-
       <div id="alert3"></div>
       <hr class="divider" />
-      <button class="btn btn-primary" onclick="simulatePay()">Send payment</button>
+      <button class="btn btn-primary" id="payBtn" onclick="metamaskPay()">
+        Send payment in MetaMask
+      </button>
+      <p style="text-align:center;font-size:11.5px;color:var(--muted);margin-top:10px">
+        No MetaMask? <a href="#" onclick="simulatePay();return false" style="color:var(--primary)">Simulate instead</a>
+      </p>
     </div>
 
     <!-- Step 4 -->
     <div id="payStep4" style="display:none">
       <div class="alert alert-success">
         <span class="alert-icon">✓</span>
-        <div><strong>Payment submitted successfully</strong><br>In production this transaction would be broadcast via your wallet.</div>
+        <div><strong>Payment sent!</strong><br>Transaction submitted to the blockchain.</div>
       </div>
 
       <div class="result-grid" style="margin-top:20px">
@@ -733,10 +740,17 @@
           <span class="result-label">Merchant</span>
           <span class="result-value mono" id="doneMerchant">—</span>
         </div>
+        <div class="result-item full" id="doneTxRow" style="display:none">
+          <span class="result-label">Transaction hash</span>
+          <a id="doneTxHash" href="#" target="_blank" style="font-family:monospace;font-size:12px;color:var(--primary);word-break:break-all">—</a>
+        </div>
       </div>
 
       <hr class="divider" />
-      <button class="btn btn-outline" onclick="resetPay()">New payment</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="resetPay()" style="flex:1">New payment</button>
+        <button class="btn btn-primary" id="verifyDoneBtn" onclick="" style="flex:1">Verify on-chain</button>
+      </div>
     </div>
   </div>
 </main>
@@ -946,6 +960,40 @@ async function checkNetwork() {
 checkNetwork();
 setInterval(checkNetwork, 15000);
 
+// ── Invoice link auto-fill ────────────────────────────────────────────────────
+// Merchants share links like: index.html?invoice=INV-001&merchant=0xABC&amount=100
+(function loadFromUrl() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('invoice'))  document.getElementById('invoiceId').value    = p.get('invoice');
+  if (p.get('merchant')) document.getElementById('merchantAddr').value = p.get('merchant');
+  if (p.get('amount'))   { document.getElementById('amount').value = p.get('amount'); updateSummary(); }
+  if (p.get('invoice') || p.get('merchant') || p.get('amount')) {
+    // Show pay page and a banner
+    document.getElementById('alert1').innerHTML =
+      `<div class="alert alert-info" style="margin-top:16px"><span>ℹ</span><div><strong>Invoice pre-loaded from link.</strong> Connect your wallet and click Continue.</div></div>`;
+  }
+})();
+
+// ── Share invoice link ────────────────────────────────────────────────────────
+function copyInvoiceLink() {
+  const invoice  = document.getElementById('invoiceId').value.trim();
+  const merchant = document.getElementById('merchantAddr').value.trim();
+  const amount   = document.getElementById('amount').value.trim();
+  if (!invoice || !merchant) {
+    alert('Fill in Invoice ID and Merchant address first.');
+    return;
+  }
+  const params = new URLSearchParams({ invoice, merchant });
+  if (amount) params.set('amount', amount);
+  const url = `${location.origin}${location.pathname}?${params.toString()}`;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('shareLinkBtn');
+    btn.textContent = 'Copied!';
+    btn.style.background = '#0a7c59';
+    setTimeout(() => { btn.textContent = 'Share link'; btn.style.background = ''; }, 2000);
+  });
+}
+
 // ── Fee summary ───────────────────────────────────────────────────────────────
 function updateSummary() {
   const v = parseFloat(document.getElementById('amount').value);
@@ -971,6 +1019,65 @@ function showAlert(id, type, html) {
   document.getElementById(id).innerHTML = `<div class="alert alert-${type}" style="margin-top:16px"><span class="alert-icon">${type==='error'?'✕':type==='success'?'✓':'ℹ'}</span><div>${html}</div></div>`;
 }
 
+// ── Wallet connection ─────────────────────────────────────────────────────────
+let connectedWallet = null;
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert('MetaMask not found.\n\nInstall MetaMask from metamask.io then refresh this page.');
+    return;
+  }
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    connectedWallet = accounts[0];
+    const btn = document.getElementById('connectBtn');
+    btn.textContent = trunc(connectedWallet);
+    btn.style.background = '#0a7c59';
+    // Auto-fill payer address
+    document.getElementById('payerAddr').value = connectedWallet;
+
+    // Prompt MetaMask to switch to Sepolia if needed
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0xaa36a7' }], // Sepolia
+      });
+    } catch (switchErr) {
+      if (switchErr.code === 4902) {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{ chainId: '0xaa36a7', chainName: 'Sepolia', nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: ['https://rpc.sepolia.org'], blockExplorerUrls: ['https://sepolia.etherscan.io'] }]
+        });
+      }
+    }
+
+    // Listen for account changes
+    window.ethereum.on('accountsChanged', accs => {
+      connectedWallet = accs[0] || null;
+      const b = document.getElementById('connectBtn');
+      if (connectedWallet) {
+        b.textContent = trunc(connectedWallet);
+        b.style.background = '#0a7c59';
+      } else {
+        b.textContent = 'Connect Wallet';
+        b.style.background = '';
+      }
+    });
+  } catch (e) {
+    alert('Wallet connection rejected.');
+  }
+}
+
+function fillWallet() {
+  if (!connectedWallet) {
+    connectWallet().then(() => {
+      if (connectedWallet) document.getElementById('payerAddr').value = connectedWallet;
+    });
+    return;
+  }
+  document.getElementById('payerAddr').value = connectedWallet;
+}
+
 // ── Pay flow ──────────────────────────────────────────────────────────────────
 let payState = {};
 
@@ -984,7 +1091,7 @@ async function initiatePayment() {
     return showAlert('alert1', 'error', 'All fields are required.');
 
   document.getElementById('alert1').innerHTML =
-    `<div class="alert alert-info" style="margin-top:16px"><div class="spinner"></div><div>Preparing calldata…</div></div>`;
+    `<div class="alert alert-info" style="margin-top:16px"><div class="spinner"></div><div>Preparing transaction…</div></div>`;
 
   try {
     const resp = await fetch(`${API_BASE}/initiate`, {
@@ -996,34 +1103,132 @@ async function initiatePayment() {
     if (!data.success) return showAlert('alert1', 'error', data.message || data.error);
 
     payState = data;
-    document.getElementById('approveCalldata').value = data.approveCalldata || '';
-    document.getElementById('approveToken').value    = data.tokenAddress    || '';
+
+    // Populate step 2 summary
+    document.getElementById('approveToken').textContent   = data.tokenAddress      || '—';
+    document.getElementById('approveSpender').textContent = data.contractAddress   || '—';
+    document.getElementById('approveAmt').textContent     = `${amount.toFixed(2)} USDC`;
+
     setStep(2);
   } catch (e) {
     showAlert('alert1', 'error', `Backend unreachable — is Spring Boot running?<br><small style="opacity:.7">${e.message}</small>`);
   }
 }
 
-function simulateApprove() {
-  document.getElementById('payCalldata').value     = payState.calldata        || '';
-  document.getElementById('contractAddrDisp').value = payState.contractAddress || '';
-  document.getElementById('estGas').value           = payState.estimatedGas   || '';
-  setStep(3);
+// Step 2 — real MetaMask approve()
+async function metamaskApprove() {
+  if (!window.ethereum) return simulateApprove();
+
+  const payer = document.getElementById('payerAddr').value.trim();
+  if (!payer) return showAlert('alert2', 'error', 'Wallet address missing — connect MetaMask first.');
+
+  setLoading('approveBtn', true, 'Waiting for MetaMask…');
+  try {
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: payer, to: payState.tokenAddress, data: payState.approveCalldata }]
+    });
+    showAlert('alert2', 'info', `<div class="spinner"></div> Approval tx sent — waiting for confirmation…<br><small style="font-family:monospace">${txHash}</small>`);
+
+    await waitForReceipt(txHash);
+    showAlert('alert2', 'success', `✓ Approval confirmed!`);
+    setTimeout(() => {
+      populateStep3();
+      setStep(3);
+    }, 800);
+  } catch (e) {
+    if (e.code === 4001) showAlert('alert2', 'warning', 'Transaction rejected in MetaMask.');
+    else showAlert('alert2', 'error', e.message);
+  } finally {
+    setLoading('approveBtn', false, 'Approve in MetaMask');
+  }
 }
 
-function simulatePay() {
+function simulateApprove() {
+  showAlert('alert2', 'info', 'Approval simulated (no MetaMask).');
+  setTimeout(() => { populateStep3(); setStep(3); }, 600);
+}
+
+function populateStep3() {
+  document.getElementById('payInvoiceDisp').textContent   = document.getElementById('invoiceId').value;
+  document.getElementById('payMerchantDisp').textContent  = trunc(document.getElementById('merchantAddr').value);
+  document.getElementById('contractAddrDisp').textContent = trunc(payState.contractAddress || '—');
+  document.getElementById('payAmtDisp').textContent       = `${parseFloat(document.getElementById('amount').value).toFixed(2)} USDC`;
+}
+
+// Step 3 — real MetaMask pay()
+async function metamaskPay() {
+  if (!window.ethereum) return simulatePay();
+
+  const payer = document.getElementById('payerAddr').value.trim();
+  if (!payer) return showAlert('alert3', 'error', 'Wallet address missing — connect MetaMask first.');
+
+  setLoading('payBtn', true, 'Waiting for MetaMask…');
+  try {
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: payer, to: payState.contractAddress, data: payState.calldata, gas: '0x' + (parseInt(payState.estimatedGas || '200000')).toString(16) }]
+    });
+
+    showAlert('alert3', 'info', `<div class="spinner"></div> Payment tx sent — confirming on-chain…<br><small style="font-family:monospace">${txHash}</small>`);
+    await waitForReceipt(txHash);
+    completePay(txHash);
+  } catch (e) {
+    if (e.code === 4001) showAlert('alert3', 'warning', 'Transaction rejected in MetaMask.');
+    else showAlert('alert3', 'error', e.message);
+  } finally {
+    setLoading('payBtn', false, 'Send payment in MetaMask');
+  }
+}
+
+function simulatePay(txHash) {
+  completePay(txHash || null);
+}
+
+function completePay(txHash) {
   document.getElementById('doneInvoice').textContent  = document.getElementById('invoiceId').value;
   document.getElementById('doneAmount').textContent   = `$${parseFloat(document.getElementById('amount').value).toFixed(2)} USDC`;
   document.getElementById('doneMerchant').textContent = document.getElementById('merchantAddr').value;
+
+  if (txHash) {
+    const explorerUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+    const link = document.getElementById('doneTxHash');
+    link.href = explorerUrl;
+    link.textContent = txHash;
+    document.getElementById('doneTxRow').style.display = 'flex';
+    document.getElementById('verifyDoneBtn').onclick = () => {
+      document.getElementById('txHashInput').value = txHash;
+      showPage('verify', document.querySelectorAll('nav button')[2]);
+      setTimeout(verifyTx, 300);
+    };
+  }
   setStep(4);
 }
 
 function resetPay() {
   ['invoiceId','merchantAddr','payerAddr','amount'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('summaryBox').style.display = 'none';
+  document.getElementById('doneTxRow').style.display = 'none';
   document.getElementById('alert1').innerHTML = '';
   payState = {};
   setStep(1);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setLoading(btnId, loading, label) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading ? `<div class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,.3)"></div> ${label}` : label;
+}
+
+async function waitForReceipt(txHash, maxAttempts = 30, intervalMs = 2000) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const receipt = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
+    if (receipt) return receipt;
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  throw new Error('Transaction receipt timeout — check Etherscan for status.');
 }
 
 // ── Verify ────────────────────────────────────────────────────────────────────
