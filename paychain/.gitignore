@@ -1,0 +1,15 @@
+# Secrets — NEVER commit
+.env
+
+# Hardhat
+node_modules/
+artifacts/
+cache/
+
+# Maven
+backend/target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
