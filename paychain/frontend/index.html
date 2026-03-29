@@ -817,38 +817,19 @@
   </div>
 </main>
 
-<!-- ══════════════════════════════ TRANSAK MODAL -->
-<div class="modal-backdrop" id="transakModal">
-  <div class="modal">
+<!-- ══════════════════════════════ LAUNCHED CONFIRMATION MODAL -->
+<div class="modal-backdrop" id="launchModal">
+  <div class="modal" style="max-width:400px">
     <div class="modal-header">
-      <h3>🔷 Transak — Buy USDC</h3>
-      <button class="modal-close" onclick="closeModal('transakModal')">✕</button>
+      <h3 id="launchModalTitle">Opening provider…</h3>
+      <button class="modal-close" onclick="closeModal('launchModal')">✕</button>
     </div>
     <div class="modal-body">
-      <div id="transakFrame" style="min-height:500px;display:flex;align-items:center;justify-content:center;">
-        <div style="text-align:center;color:var(--muted)">
-          <div class="spinner" style="margin:0 auto 12px"></div>
-          <div style="font-size:13px">Loading Transak…</div>
-        </div>
-      </div>
+      <div id="launchModalBody"></div>
     </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════ MOONPAY MODAL -->
-<div class="modal-backdrop" id="moonpayModal">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>🌙 MoonPay — Buy USDC</h3>
-      <button class="modal-close" onclick="closeModal('moonpayModal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div id="moonpayFrame" style="min-height:500px;display:flex;align-items:center;justify-content:center;">
-        <div style="text-align:center;color:var(--muted)">
-          <div class="spinner" style="margin:0 auto 12px"></div>
-          <div style="font-size:13px">Loading MoonPay…</div>
-        </div>
-      </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="launchModalBtn" onclick="">Open again</button>
+      <button class="btn btn-outline" onclick="closeModal('launchModal')">Done</button>
     </div>
   </div>
 </div>
@@ -1143,11 +1124,12 @@ function trunc(a) {
 
 // ── On-ramp ───────────────────────────────────────────────────────────────────
 
-// Transak staging API key — replace with your production key from transak.com/developer
-const TRANSAK_API_KEY = 'a613be3c-8652-4d69-9221-10f99b8e0e8f'; // staging key
-const TRANSAK_ENV     = 'STAGING'; // change to 'PRODUCTION' for live
+// ⚠ Replace these with your real API keys from transak.com/developer and moonpay.com/dashboard
+const TRANSAK_API_KEY  = 'YOUR_TRANSAK_API_KEY';   // get free key at transak.com/developer
+const MOONPAY_API_KEY  = 'YOUR_MOONPAY_API_KEY';   // get free key at moonpay.com/dashboard
 
 let selectedProvider = 'transak';
+let lastPopupUrl     = '';
 
 function selectProvider(name) {
   selectedProvider = name;
@@ -1159,83 +1141,103 @@ function showPageByName(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  // highlight the correct nav button
-  const btns = document.querySelectorAll('nav button');
-  btns.forEach(b => {
+  document.querySelectorAll('nav button').forEach(b => {
     if (b.textContent.trim() === 'Buy USDC') b.classList.add('active');
   });
 }
 
 function openOnramp() {
-  const wallet = document.getElementById('onrampWallet').value.trim();
-  const amount = document.getElementById('onrampAmount').value.trim();
+  const wallet  = document.getElementById('onrampWallet').value.trim();
+  const amount  = document.getElementById('onrampAmount').value.trim();
   const alertEl = document.getElementById('onrampAlert');
 
   if (!wallet || !/^0x[0-9a-fA-F]{40}$/.test(wallet)) {
-    alertEl.innerHTML = '<div class="alert alert-error" style="margin-top:16px"><span>✕</span><div>Enter a valid wallet address.</div></div>';
+    alertEl.innerHTML = '<div class="alert alert-error" style="margin-top:16px"><span>✕</span><div>Enter a valid wallet address (0x…).</div></div>';
     return;
   }
   if (!amount || parseFloat(amount) < 1) {
-    alertEl.innerHTML = '<div class="alert alert-error" style="margin-top:16px"><span>✕</span><div>Enter an amount.</div></div>';
+    alertEl.innerHTML = '<div class="alert alert-error" style="margin-top:16px"><span>✕</span><div>Enter an amount of at least $1.</div></div>';
     return;
   }
   alertEl.innerHTML = '';
 
-  if (selectedProvider === 'transak') openTransak(wallet, amount);
-  else openMoonPay(wallet, amount);
+  if (selectedProvider === 'transak') launchTransak(wallet, amount);
+  else launchMoonPay(wallet, amount);
 }
 
-function openTransak(wallet, amount) {
+function launchTransak(wallet, amount) {
   const params = new URLSearchParams({
-    apiKey:             TRANSAK_API_KEY,
-    environment:        TRANSAK_ENV,
-    cryptoCurrencyCode: 'USDC',
-    network:            'ethereum',
-    walletAddress:      wallet,
-    fiatCurrency:       'USD',
-    fiatAmount:         amount,
+    apiKey:                   TRANSAK_API_KEY,
+    cryptoCurrencyCode:       'USDC',
+    network:                  'ethereum',
+    walletAddress:            wallet,
+    fiatCurrency:             'USD',
+    fiatAmount:               amount,
     disableWalletAddressForm: 'true',
-    hideMenu:           'true',
-    themeColor:         '635bff',
+    themeColor:               '635bff',
+    hideMenu:                 'true',
   });
 
-  const baseUrl = TRANSAK_ENV === 'PRODUCTION'
-    ? 'https://global.transak.com'
-    : 'https://staging-global.transak.com';
+  const url = `https://global.transak.com/?${params.toString()}`;
+  lastPopupUrl = url;
 
-  const url = `${baseUrl}/?${params.toString()}`;
+  window.open(url, 'transak_onramp', 'width=500,height=700,left=200,top=100');
 
-  document.getElementById('transakFrame').innerHTML =
-    `<iframe src="${url}" style="width:100%;height:550px;border:none;border-radius:8px" allow="camera;microphone;payment"></iframe>`;
-  document.getElementById('transakModal').classList.add('open');
+  showLaunchModal(
+    '🔷 Transak opened',
+    `<div class="alert alert-success" style="margin-top:0">
+       <span>✓</span>
+       <div><strong>Transak has opened in a new window.</strong><br>
+       Complete your purchase there — USDC will be sent directly to your wallet.</div>
+     </div>
+     <div class="how-steps" style="margin-top:16px">
+       <div class="how-step"><div class="how-num">1</div><div class="how-text"><strong>Complete KYC</strong><span>Quick ID check — takes 1–2 min.</span></div></div>
+       <div class="how-step"><div class="how-num">2</div><div class="how-text"><strong>Pay with card</strong><span>Visa, Mastercard or Apple Pay.</span></div></div>
+       <div class="how-step"><div class="how-num">3</div><div class="how-text"><strong>USDC arrives</strong><span>Usually within 1–5 minutes.</span></div></div>
+     </div>
+     <p style="font-size:12px;color:var(--muted);margin-top:14px">Wallet: <code style="font-size:11px">${wallet}</code></p>`,
+    url
+  );
 }
 
-function openMoonPay(wallet, amount) {
-  // MoonPay sandbox — replace YOUR_MOONPAY_API_KEY with your key from moonpay.com/dashboard
+function launchMoonPay(wallet, amount) {
   const params = new URLSearchParams({
-    apiKey:          'pk_test_YOUR_MOONPAY_API_KEY',
-    currencyCode:    'usdc',
-    walletAddress:   wallet,
-    baseCurrencyCode:'usd',
+    apiKey:             MOONPAY_API_KEY,
+    currencyCode:       'usdc',
+    walletAddress:      wallet,
+    baseCurrencyCode:   'usd',
     baseCurrencyAmount: amount,
-    colorCode:       '%23635bff',
+    colorCode:          '%23635bff',
   });
 
-  const url = `https://buy-sandbox.moonpay.com/?${params.toString()}`;
+  const url = `https://buy.moonpay.com/?${params.toString()}`;
+  lastPopupUrl = url;
 
-  document.getElementById('moonpayFrame').innerHTML =
-    `<iframe src="${url}" style="width:100%;height:550px;border:none;border-radius:8px" allow="payment"></iframe>`;
-  document.getElementById('moonpayModal').classList.add('open');
+  window.open(url, 'moonpay_onramp', 'width=500,height=700,left=200,top=100');
+
+  showLaunchModal(
+    '🌙 MoonPay opened',
+    `<div class="alert alert-success" style="margin-top:0">
+       <span>✓</span>
+       <div><strong>MoonPay has opened in a new window.</strong><br>
+       Complete your purchase there — USDC will arrive in your wallet.</div>
+     </div>
+     <p style="font-size:12px;color:var(--muted);margin-top:14px">Wallet: <code style="font-size:11px">${wallet}</code></p>`,
+    url
+  );
+}
+
+function showLaunchModal(title, bodyHtml, url) {
+  document.getElementById('launchModalTitle').textContent = title;
+  document.getElementById('launchModalBody').innerHTML    = bodyHtml;
+  document.getElementById('launchModalBtn').onclick       = () => window.open(url, '_blank');
+  document.getElementById('launchModal').classList.add('open');
 }
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
-  // clear iframe to stop any active session
-  const frame = document.getElementById(id.replace('Modal','Frame'));
-  if (frame) frame.innerHTML = `<div style="text-align:center;color:var(--muted);padding:40px"><div style="font-size:13px">Session ended.</div></div>`;
 }
 
-// close modal on backdrop click
 document.querySelectorAll('.modal-backdrop').forEach(el => {
   el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
 });
