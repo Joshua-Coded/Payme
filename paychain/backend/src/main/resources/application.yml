@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: paychain-backend
+
+server:
+  port: 8080
+
+# ── PayChain Blockchain Config ────────────────────────────────────────────────
+paychain:
+  # RPC endpoint — replace with your Infura/Alchemy URL for Sepolia, or
+  # leave as localhost:8545 for a local Hardhat node
+  rpc-url: ${RPC_URL:http://127.0.0.1:8545}
+
+  # Chain ID: 31337 = Hardhat local, 11155111 = Sepolia
+  chain-id: ${CHAIN_ID:31337}
+
+  # Deployed StablecoinPayment contract address
+  contract-address: ${CONTRACT_ADDRESS:0x0000000000000000000000000000000000000000}
+
+  # Operator private key (used for read-only eth_call; never signs user txs)
+  # For production, load this from a secrets manager — never commit a real key.
+  operator-private-key: ${OPERATOR_PRIVATE_KEY:0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+
+  # ERC-20 token addresses
+  usdc-address: ${USDC_ADDRESS:0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238}
+
+  # Transaction receipt polling
+  poll-interval-ms: 2000
+  poll-max-attempts: 30
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.paychain: DEBUG
+    org.web3j: WARN
